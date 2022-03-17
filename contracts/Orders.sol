@@ -21,6 +21,8 @@ contract Orders {
   }
 
   event OrderPaid (string id, address paidAddress, uint256 paidAmount, uint256 date);
+  event OrderDelivered(string id, uint256 date);
+  event OrderRefunded(string id, uint256 date);
 
   address owner;
   mapping(string => Order) orders;
@@ -68,9 +70,40 @@ contract Orders {
     emit OrderPaid(id, msg.sender, msg.value, block.timestamp);
   }
 
-  
+  function deliver(string memory id) public onlyOwner {
+    Order storage order = orders[id];
 
-  function getTime() internal view returns (uint256) {
+    require(order.createdDate > 0, "Order is not found");
+    require(order.deliveredDate == 0, "The order has been delivered");
+
+    order.status = Status.Delivered;
+    order.deliveredDate = block.timestamp;
+
+    emit OrderDelivered(id, order.deliveredDate);
+  }
+
+  function refund(string memory id) public {
+    Order storage order = orders[id];
+    require(order.createdDate > 0, "Order is not found");
+
+    Payment storage payment = payments[id];
+    require(payment.paidDate > 0, "The order has not been paid for");
+    require(order.deliveredDate == 0, "The order has been delivered");
+    require(payment.refundedDate == 0, "The order has been refunded");
+
+    require(payment.buyeraddress == msg.sender, "The buyer address does not match the address of the transaction");
+
+    require(uint256(getTime()) > order.deliveryDate, "The delivery date is not over yet");
+
+    payment.buyeraddress.transfer(order.totalPrice);
+    order.status = Status.Refunded;
+
+    payment.refundedDate = getTime();
+
+     emit OrderRefunded(id, payment.refundedDate);
+  }
+
+  function getTime() virtual internal view returns (uint256) {
     return block.timestamp;
   }
 }

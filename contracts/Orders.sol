@@ -13,8 +13,18 @@ contract Orders {
     uint256 deliveredDate;
   }
 
+  struct Payment {
+    string id;
+    address payable buyeraddress;
+    uint256 paidDate;
+    uint256 refundedDate;
+  }
+
+  event OrderPaid (string id, address paidAddress, uint256 paidAmount, uint256 date);
+
   address owner;
   mapping(string => Order) orders;
+  mapping(string => Payment) payments;
 
   modifier onlyOwner {
     require(msg.sender == owner, "The sender is not authorized to perform transaction");
@@ -38,5 +48,29 @@ contract Orders {
       order.deliveryDate,
       order.deliveredDate
     );
+  }
+
+  function pay(string memory id) public payable {
+    Order storage order = orders[id];
+
+    require(order.createdDate > 0, "Order is not found");
+
+    Payment storage payment = payments[id];
+
+    require(payment.paidDate == 0, "The order has been paid");
+
+    require(msg.value == order.totalPrice, "The order price does not match the value of the transaction");
+    
+    order.status = Status.Paid;
+
+    payments[id] = Payment(id, payable(msg.sender), getTime(), 0);
+
+    emit OrderPaid(id, msg.sender, msg.value, block.timestamp);
+  }
+
+  
+
+  function getTime() internal view returns (uint256) {
+    return block.timestamp;
   }
 }
